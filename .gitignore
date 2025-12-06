@@ -90,3 +90,5 @@ Thumbs.db
 # Application specific
 *.pyc
 training_results.json
+
+env.sh/
