@@ -478,10 +478,6 @@ if 'chatbot' not in st.session_state:
         st.session_state.chatbot = None
         st.session_state.chat_history = []
 
-# Ensure chat_history exists even if chatbot doesn't
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-
 if 'preprocessor' not in st.session_state:
     st.session_state.preprocessor = RealEstateDataPreprocessor()
 
@@ -502,73 +498,6 @@ if 'models' not in st.session_state:
 
 if 'analytics' not in st.session_state:
     st.session_state.analytics = InvestmentAnalytics()
-
-# Initialize shared context for cross-page data
-if 'shared_context' not in st.session_state:
-    st.session_state.shared_context = {
-        'last_prediction': None,  # Stores latest prediction data
-        'last_analysis': None     # Stores latest investment analysis
-    }
-
-# Initialize page-specific state containers
-if 'page_states' not in st.session_state:
-    st.session_state.page_states = {
-        "🏡 Home": {},
-        "🔮 Price Prediction": {},
-        "💰 Investment Analysis": {},
-        "📊 Model Insights": {},
-        "🤖 AI Assistant": {},
-        "📈 Market Dashboard": {}
-    }
-
-# Track last page to detect navigation
-if 'last_page' not in st.session_state:
-    st.session_state.last_page = st.session_state.current_page
-
-# Function to clear page-specific cache
-def clear_page_cache(leaving_page):
-    """Clear cache for a specific page when leaving it"""
-    
-    # Clear prediction-specific states when leaving prediction page
-    if leaving_page == "🔮 Price Prediction":
-        keys_to_clear = [
-            'prediction_made', 'predicted_price', 'prediction_area',
-            'prediction_bedrooms', 'prediction_bathrooms', 'prediction_stories',
-            'prediction_parking', 'prediction_furnishing', 'prediction_furnishing_val'
-        ]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-    
-    # Clear investment analysis states when leaving investment page  
-    elif leaving_page == "💰 Investment Analysis":
-        keys_to_clear = [
-            'analysis_result', 'investment_calculated', 'roi_data',
-            'investment_inputs'
-        ]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-    
-    # Clear page-specific state
-    if leaving_page in st.session_state.page_states:
-        st.session_state.page_states[leaving_page] = {}
-
-# Function to get page-specific state
-def get_page_state(key, default=None):
-    """Get state value for current page"""
-    current_page = st.session_state.current_page
-    if current_page in st.session_state.page_states:
-        return st.session_state.page_states[current_page].get(key, default)
-    return default
-
-# Function to set page-specific state
-def set_page_state(key, value):
-    """Set state value for current page"""
-    current_page = st.session_state.current_page
-    if current_page in st.session_state.page_states:
-        st.session_state.page_states[current_page][key] = value
-
 
 # Sidebar with modern design
 with st.sidebar:
@@ -603,17 +532,10 @@ with st.sidebar:
             "📈 Market Dashboard"
         ] else 0
     )
-    # Update session state when radio changes and clear old page cache
+    
+    # Update session state when radio changes
     if page != st.session_state.current_page:
-        # Clear cache from the page we're leaving
-        clear_page_cache(st.session_state.current_page)
-        
-        # Update to new page
-        st.session_state.last_page = st.session_state.current_page
         st.session_state.current_page = page
-        
-        # Force a rerun to ensure clean state
-        st.rerun()
     
     st.markdown("---")
     
@@ -782,113 +704,14 @@ if page == "🏡 Home":
     
     # CTA
     st.markdown("---")
-    
-    # Data Upload Section
-    st.markdown("<h2>📤 Upload Your Property Data</h2>", unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-card">
-        <p style="margin:0; font-size:1rem;">
-            Upload your property dataset (CSV format) to unlock personalized analytics 
-            and see your real market data in the dashboard!
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Check if data is already loaded
-    if hasattr(st.session_state.preprocessor, 'data') and st.session_state.preprocessor.data is not None:
-        st.success(f"✅ Data loaded: **{len(st.session_state.preprocessor.data)} properties** in your dataset")
-        
-        col_info, col_clear = st.columns([3, 1])
-        with col_info:
-            st.info("💡 Your data is being used in Market Dashboard and other analytics")
-        with col_clear:
-            if st.button("🗑️ Clear Data", key="clear_uploaded_data"):
-                st.session_state.preprocessor.data = None
-                if hasattr(st.session_state, 'data_just_uploaded'):
-                    st.session_state.data_just_uploaded = False
-                st.rerun()
-        
-        # Show next steps if data was just uploaded
-        if hasattr(st.session_state, 'data_just_uploaded') and st.session_state.data_just_uploaded:
-            st.markdown("---")
-            st.markdown("### 🎯 Next Steps:")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("📈 View Market Dashboard", key="goto_dashboard", use_container_width=True):
-                    st.session_state.data_just_uploaded = False
-                    st.session_state.current_page = "📈 Market Dashboard"
-                    st.rerun()
-            with col_b:
-                if st.button("🔮 Make Predictions", key="goto_prediction_home", use_container_width=True):
-                    st.session_state.data_just_uploaded = False
-                    st.session_state.current_page = "🔮 Price Prediction"
-                    st.rerun()
-    else:
-        uploaded_file = st.file_uploader(
-            "Choose a CSV file",
-            type=['csv'],
-            help="Upload a CSV file containing property data with columns like: price, area, bedrooms, bathrooms, etc.",
-            key="home_data_upload"
-        )
-        
-        if uploaded_file is not None:
-            try:
-                with st.spinner("📊 Loading your data..."):
-                    # Read the CSV
-                    df = pd.read_csv(uploaded_file)
-                    
-                    st.success(f"✅ Successfully loaded **{len(df)} properties** with **{len(df.columns)} features**!")
-                    
-                    # Show preview
-                    with st.expander("👀 Preview Data (first 5 rows)"):
-                        st.dataframe(df.head())
-                    
-                    # Show column info
-                    with st.expander("📋 Dataset Information"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.markdown("**Columns:**")
-                            for col in df.columns:
-                                st.write(f"- {col}")
-                        with col2:
-                            st.markdown("**Statistics:**")
-                            st.write(f"- Total Rows: {len(df)}")
-                            st.write(f"- Total Columns: {len(df.columns)}")
-                            st.write(f"- Missing Values: {df.isnull().sum().sum()}")
-                    
-                    # Store in preprocessor
-                    if st.button("✅ Use This Data", key="confirm_upload", type="primary"):
-                        st.session_state.preprocessor.data = df
-                        st.session_state.data_just_uploaded = True  # Flag for showing next steps
-                        st.rerun()
-                        
-            except Exception as e:
-                st.error(f"❌ Error loading file: {str(e)}")
-                st.info("💡 Make sure your CSV file is properly formatted with headers.")
-    
-    st.markdown("---")
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         if st.button("🚀 Start Predicting Now", use_container_width=True):
             st.session_state.current_page = "🔮 Price Prediction"
             st.rerun()
 
-
-# ==============================================================================
-# NOTE: For full cache management, update this section to use:
-#   - set_page_state('key', value) instead of st.session_state.key = value
-#   - get_page_state('key', default) instead of st.session_state.get('key', default)
-# ==============================================================================
 elif page == "🔮 Price Prediction":
-    # Header with clear button
-    col_header, col_clear = st.columns([5, 1])
-    with col_header:
-        st.markdown("<h1>🔮 Property Price Prediction</h1>", unsafe_allow_html=True)
-    with col_clear:
-        if st.button("🔄 Clear", key="clear_prediction_page", help="Clear all predictions"):
-            clear_page_cache(st.session_state.current_page)
-            st.rerun()
+    st.markdown("<h1>🔮 Property Price Prediction</h1>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class="info-box">
@@ -952,9 +775,9 @@ elif page == "🔮 Price Prediction":
         
         if predict_button:
             # Store prediction flag in session state
-            set_page_state('prediction_made', True)
+            st.session_state.prediction_made = True
             
-        if get_page_state('prediction_made', False):
+        if st.session_state.get('prediction_made', False):
             with st.spinner("🔄 Analyzing property..."):
                 # Convert to binary
                 mainroad_val = 1 if mainroad == "Yes" else 0
@@ -1000,33 +823,15 @@ elif page == "🔮 Price Prediction":
                 
                 predicted_price = base_price
                 
-                # Store in page-specific state
-                set_page_state('predicted_price', predicted_price)
-                set_page_state('prediction_area', area)
-                set_page_state('prediction_bedrooms', bedrooms)
-                set_page_state('prediction_bathrooms', bathrooms)
-                set_page_state('prediction_stories', stories)
-                set_page_state('prediction_parking', parking)
-                set_page_state('prediction_furnishing', furnishing)
-                set_page_state('prediction_furnishing_val', furnishing_val)
-                
-                # ALSO store in shared context for cross-page access (e.g., Model Insights)
-                st.session_state.shared_context['last_prediction'] = {
-                    'predicted_price': predicted_price,
-                    'area': area,
-                    'bedrooms': bedrooms,
-                    'bathrooms': bathrooms,
-                    'stories': stories,
-                    'parking': parking,
-                    'furnishing': furnishing,
-                    'furnishing_val': furnishing_val,
-                    'mainroad': mainroad,
-                    'guestroom': guestroom,
-                    'basement': basement,
-                    'hotwaterheating': hotwaterheating,
-                    'airconditioning': airconditioning,
-                    'prefarea': prefarea
-                }
+                # Store in session state
+                st.session_state.predicted_price = predicted_price
+                st.session_state.prediction_area = area
+                st.session_state.prediction_bedrooms = bedrooms
+                st.session_state.prediction_bathrooms = bathrooms
+                st.session_state.prediction_stories = stories
+                st.session_state.prediction_parking = parking
+                st.session_state.prediction_furnishing = furnishing
+                st.session_state.prediction_furnishing_val = furnishing_val
                 
                 # Update chatbot context
                 if st.session_state.chatbot:
@@ -1098,9 +903,9 @@ elif page == "🔮 Price Prediction":
             """, unsafe_allow_html=True)
     
     # Prediction Results Section
-    if get_page_state('prediction_made', False):
-        predicted_price = get_page_state('predicted_price')
-        area = get_page_state('prediction_area')
+    if st.session_state.get('prediction_made', False):
+        predicted_price = st.session_state.predicted_price
+        area = st.session_state.prediction_area
         
         st.markdown("---")
         st.markdown("<h2>📈 Investment Outlook</h2>", unsafe_allow_html=True)
@@ -1165,21 +970,8 @@ elif page == "🔮 Price Prediction":
             </div>
             """, unsafe_allow_html=True)
 
-
-# ==============================================================================
-# NOTE: For full cache management, update this section to use:
-#   - set_page_state('key', value) instead of st.session_state.key = value
-#   - get_page_state('key', default) instead of st.session_state.get('key', default)
-# ==============================================================================
 elif page == "💰 Investment Analysis":
-    # Header with clear button
-    col_header, col_clear = st.columns([5, 1])
-    with col_header:
-        st.markdown("<h1>💰 Investment Analysis Calculator</h1>", unsafe_allow_html=True)
-    with col_clear:
-        if st.button("🔄 Clear", key="clear_investment_page", help="Clear all analysis"):
-            clear_page_cache(st.session_state.current_page)
-            st.rerun()
+    st.markdown("<h1>💰 Investment Analysis Calculator</h1>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class="info-box">
@@ -1782,25 +1574,16 @@ elif page == "📊 Model Insights":
     with tab3:
         st.markdown("<h3>🔍 Prediction Explainability</h3>", unsafe_allow_html=True)
         
-        # Check if prediction exists in shared context
-        has_prediction = st.session_state.shared_context.get('last_prediction') is not None
-        
-        if models_trained and has_prediction:
+        if models_trained and st.session_state.get('prediction_made', False):
             st.markdown("""
             <div class="success-box">
                 <p style="margin:0;">✅ Analyzing your recent prediction with SHAP...</p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Get prediction data from shared context
-            prediction_data = st.session_state.shared_context['last_prediction']
-            predicted_price = prediction_data['predicted_price']
-            area = prediction_data['area']
-            bedrooms = prediction_data['bedrooms']
-            bathrooms = prediction_data['bathrooms']
-            
             # Get best model
             best_model = st.session_state.models.best_model
+            predicted_price = st.session_state.predicted_price
             best_model_display = st.session_state.models.get_best_model()
             
             col1, col2, col3 = st.columns(3)
@@ -1815,44 +1598,17 @@ elif page == "📊 Model Insights":
                     st.metric("Accuracy", f"{r2:.1%}")
             
             st.markdown("---")
-            
-            # Show prediction details
-            st.markdown("### 📊 Prediction Summary")
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.markdown(f"""
-                **Property Details:**
-                - 📏 Area: {area:,.0f} sq ft
-                - 🛏️ Bedrooms: {bedrooms}
-                - 🚿 Bathrooms: {bathrooms}
-                - 🏢 Stories: {prediction_data['stories']}
-                - 🚗 Parking: {prediction_data['parking']}
-                """)
-            
-            with col_b:
-                price_per_sqft = predicted_price / area if area > 0 else 0
-                st.markdown(f"""
-                **Valuation Breakdown:**
-                - 💰 Total Price: ₹{predicted_price:,.0f}
-                - 📊 Per Sq Ft: ₹{price_per_sqft:,.0f}
-                - 🏠 Furnishing: {prediction_data['furnishing']}
-                - ❄️ AC: {prediction_data['airconditioning']}
-                - 🛣️ Main Road: {prediction_data['mainroad']}
-                """)
-            
-            st.markdown("---")
             st.info("💡 Full SHAP analysis integrated with your existing explainability.py - Ready for deep dive analysis!")
             
         elif models_trained:
             st.markdown("""
             <div class="info-card" style="text-align:center; padding:3rem;">
                 <h3>🔮 Make a Prediction First</h3>
-                <p>Go to <strong>Price Prediction</strong> page to make a prediction, then return here to see detailed explainability analysis.</p>
+                <p>Go to <strong>Price Prediction</strong> page to see explainability</p>
             </div>
             """, unsafe_allow_html=True)
             
-            if st.button("📊 Go to Price Prediction", key="goto_prediction"):
+            if st.button("📊 Go to Price Prediction"):
                 st.session_state.current_page = "🔮 Price Prediction"
                 st.rerun()
         else:
@@ -1961,7 +1717,7 @@ elif page == "🤖 AI Assistant":
             
             3. **Restart App:**
                ```bash
-               streamlit run streamlit_app.py
+               streamlit run app/streamlit_app.py
                ```
             """)
     
@@ -2048,17 +1804,12 @@ elif page == "🤖 AI Assistant":
             
             st.rerun()
         
-        # Clear chat button
-        if st.button("🗑️ Clear Chat", key="clear_chat"):
-            st.session_state.chat_history = []
-            st.rerun()
-        
         # Context-Aware Quick Actions
         st.markdown("---")
         st.markdown("<h3>💡 Smart Questions (Context-Aware)</h3>", unsafe_allow_html=True)
         
         # Check if we have prediction or analysis context
-        has_prediction = st.session_state.shared_context.get('last_prediction') is not None
+        has_prediction = st.session_state.get('prediction_made', False)
         has_analysis = st.session_state.chatbot.context.get('analysis_results') is not None
         
         if has_prediction or has_analysis:
@@ -2113,18 +1864,26 @@ elif page == "🤖 AI Assistant":
         cols = st.columns(3)
         for idx, question in enumerate(general_questions):
             with cols[idx % 3]:
-                if st.button(f"📚 {question}", key=f"gen_q_{idx}", use_container_width=True):
+                if st.button(question, key=f"gen_q_{idx}", use_container_width=True):
                     st.session_state.chat_history.append({
                         'role': 'user',
                         'content': question
                     })
-                    with st.spinner("🤔 Thinking..."):
-                        response = st.session_state.chatbot.chat(question)
+                    response = st.session_state.chatbot.chat(question)
                     st.session_state.chat_history.append({
                         'role': 'assistant',
                         'content': response
                     })
                     st.rerun()
+        
+        # Clear chat
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            if st.button("🔄 Clear Chat History", use_container_width=True):
+                st.session_state.chat_history = []
+                st.session_state.chatbot.reset_conversation()
+                st.rerun()
 
 elif page == "📈 Market Dashboard":
     st.markdown("<h1>📈 Market Analytics Dashboard</h1>", unsafe_allow_html=True)
@@ -2133,107 +1892,25 @@ elif page == "📈 Market Dashboard":
     <div class="info-box">
         <p style="margin:0; font-size:1rem;">
             Comprehensive overview of property market trends, price distributions, 
-            and investment opportunities based on your data.
+            and investment opportunities.
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Initialize data_source flag
-    data_source = "sample"
-    dashboard_data = None
+    # Generate sample data for dashboard
+    np.random.seed(42)
+    n_properties = 50
     
-    # Try to load real data from preprocessor
-    if hasattr(st.session_state.preprocessor, 'data') and st.session_state.preprocessor.data is not None:
-        try:
-            real_data = st.session_state.preprocessor.data.copy()
-            
-            # Find price column (case-insensitive)
-            price_col = None
-            for col in real_data.columns:
-                if col.lower() in ['price', 'target', 'value', 'cost']:
-                    price_col = col
-                    break
-            
-            # Find area column (case-insensitive)
-            area_col = None
-            for col in real_data.columns:
-                if col.lower() in ['area', 'sqft', 'square_feet', 'size', 'squarefeet']:
-                    area_col = col
-                    break
-            
-            if price_col and area_col:
-                # Create dashboard data from real data
-                dashboard_data = pd.DataFrame()
-                dashboard_data['Property'] = [f'Property {i+1}' for i in range(len(real_data))]
-                dashboard_data['Price'] = real_data[price_col]
-                dashboard_data['Area'] = real_data[area_col]
-                
-                # Add bedrooms if available
-                bedroom_col = next((col for col in real_data.columns 
-                                  if col.lower() in ['bedrooms', 'beds', 'bedroom']), None)
-                if bedroom_col:
-                    dashboard_data['Bedrooms'] = real_data[bedroom_col]
-                else:
-                    dashboard_data['Bedrooms'] = np.random.randint(2, 5, len(real_data))
-                
-                # Add location if available
-                location_col = next((col for col in real_data.columns 
-                                   if col.lower() in ['location', 'locality', 'zone', 'region']), None)
-                if location_col and real_data[location_col].dtype == 'object':
-                    dashboard_data['Location'] = real_data[location_col]
-                else:
-                    dashboard_data['Location'] = np.random.choice(
-                        ['North', 'South', 'East', 'West', 'Central'], len(real_data)
-                    )
-                
-                # Add property type if available
-                type_col = next((col for col in real_data.columns 
-                               if col.lower() in ['type', 'propertytype', 'property_type', 'category']), None)
-                if type_col and real_data[type_col].dtype == 'object':
-                    dashboard_data['Type'] = real_data[type_col]
-                else:
-                    dashboard_data['Type'] = np.random.choice(
-                        ['Apartment', 'Villa', 'Independent House'], len(real_data)
-                    )
-                
-                # Calculate ROI (estimated based on area-to-price ratio)
-                dashboard_data['ROI'] = ((dashboard_data['Area'] * 1000 / dashboard_data['Price']) * 50).clip(5, 60)
-                
-                # Calculate Rental Yield (estimated at 5% annual)
-                estimated_annual_rent = dashboard_data['Price'] * 0.05
-                dashboard_data['Rental_Yield'] = (estimated_annual_rent / dashboard_data['Price'] * 100).clip(2, 10)
-                
-                data_source = "real"
-                st.success(f"✅ Analyzing **{len(dashboard_data)} real properties** from your uploaded dataset!")
-                
-        except Exception as e:
-            st.warning(f"⚠️ Could not load your data: {str(e)}. Showing sample data instead.")
-            dashboard_data = None
-    
-    # Fallback to sample data if real data not available
-    if dashboard_data is None:
-        st.info("💡 **Sample Data Displayed** - Upload your property data in the Home page to see real market analytics!")
-        
-        col_warn, col_btn = st.columns([3, 1])
-        with col_btn:
-            if st.button("📤 Go to Home", key="upload_from_dashboard"):
-                st.session_state.current_page = "🏡 Home"
-                st.rerun()
-        
-        # Generate sample data for demonstration
-        np.random.seed(42)
-        n_properties = 50
-        
-        dashboard_data = pd.DataFrame({
-            'Property': [f'Sample Property {i+1}' for i in range(n_properties)],
-            'Price': np.random.randint(2000000, 12000000, n_properties),
-            'Area': np.random.randint(2000, 10000, n_properties),
-            'Bedrooms': np.random.randint(2, 5, n_properties),
-            'ROI': np.random.uniform(10, 50, n_properties),
-            'Rental_Yield': np.random.uniform(3, 8, n_properties),
-            'Location': np.random.choice(['North', 'South', 'East', 'West', 'Central'], n_properties),
-            'Type': np.random.choice(['Apartment', 'Villa', 'Independent House'], n_properties)
-        })
+    dashboard_data = pd.DataFrame({
+        'Property': [f'Property {i+1}' for i in range(n_properties)],
+        'Price': np.random.randint(2000000, 12000000, n_properties),
+        'Area': np.random.randint(2000, 10000, n_properties),
+        'Bedrooms': np.random.randint(2, 5, n_properties),
+        'ROI': np.random.uniform(10, 50, n_properties),
+        'Rental_Yield': np.random.uniform(3, 8, n_properties),
+        'Location': np.random.choice(['North', 'South', 'East', 'West', 'Central'], n_properties),
+        'Type': np.random.choice(['Apartment', 'Villa', 'Independent House'], n_properties)
+    })
     
     # Key metrics overview
     col1, col2, col3, col4 = st.columns(4)

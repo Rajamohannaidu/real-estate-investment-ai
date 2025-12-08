@@ -1,4 +1,4 @@
-# src/predictive_models.py
+# src/predictive_models.py - UPDATED FOR DYNAMIC MODEL INSIGHTS
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,9 @@ class RealEstatePredictiveModels:
         self.models = {}
         self.best_model = None
         self.best_model_name = None
+        # NEW: Add these two lines for compatibility with Model Insights
+        self.trained_models = self.models  # Alias for compatibility
+        self.model_metrics = {}            # Store metrics with display names
         
     def build_neural_network(self, input_dim):
         """Build a deep learning model for price prediction"""
@@ -39,7 +42,8 @@ class RealEstatePredictiveModels:
         
         return model
     
-    def train_all_models(self, X_train, y_train, X_test, y_test):
+    # UPDATED: Make X_test and y_test optional
+    def train_all_models(self, X_train, y_train, X_test=None, y_test=None):
         """Train multiple models and compare performance"""
         results = {}
         
@@ -48,35 +52,55 @@ class RealEstatePredictiveModels:
         lr = LinearRegression()
         lr.fit(X_train, y_train)
         self.models['linear_regression'] = lr
-        results['linear_regression'] = self.evaluate_model(lr, X_test, y_test)
+        
+        if X_test is not None and y_test is not None:
+            results['linear_regression'] = self.evaluate_model(lr, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['Linear Regression'] = results['linear_regression']
         
         # 2. Ridge Regression
         print("Training Ridge Regression...")
         ridge = Ridge(alpha=1.0)
         ridge.fit(X_train, y_train)
         self.models['ridge'] = ridge
-        results['ridge'] = self.evaluate_model(ridge, X_test, y_test)
+        
+        if X_test is not None and y_test is not None:
+            results['ridge'] = self.evaluate_model(ridge, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['Ridge'] = results['ridge']
         
         # 3. Random Forest
         print("Training Random Forest...")
         rf = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
         rf.fit(X_train, y_train)
         self.models['random_forest'] = rf
-        results['random_forest'] = self.evaluate_model(rf, X_test, y_test)
+        
+        if X_test is not None and y_test is not None:
+            results['random_forest'] = self.evaluate_model(rf, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['Random Forest'] = results['random_forest']
         
         # 4. Gradient Boosting
         print("Training Gradient Boosting...")
         gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
         gb.fit(X_train, y_train)
         self.models['gradient_boosting'] = gb
-        results['gradient_boosting'] = self.evaluate_model(gb, X_test, y_test)
+        
+        if X_test is not None and y_test is not None:
+            results['gradient_boosting'] = self.evaluate_model(gb, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['Gradient Boosting'] = results['gradient_boosting']
         
         # 5. XGBoost
         print("Training XGBoost...")
         xgb = XGBRegressor(n_estimators=100, random_state=42, n_jobs=-1)
         xgb.fit(X_train, y_train)
         self.models['xgboost'] = xgb
-        results['xgboost'] = self.evaluate_model(xgb, X_test, y_test)
+        
+        if X_test is not None and y_test is not None:
+            results['xgboost'] = self.evaluate_model(xgb, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['XGBoost'] = results['xgboost']
         
         # 6. LightGBM
         print("Training LightGBM...")
@@ -84,7 +108,11 @@ class RealEstatePredictiveModels:
                             verbose=-1, min_child_samples=5)
         lgbm.fit(X_train, y_train)
         self.models['lightgbm'] = lgbm
-        results['lightgbm'] = self.evaluate_model(lgbm, X_test, y_test)
+        
+        if X_test is not None and y_test is not None:
+            results['lightgbm'] = self.evaluate_model(lgbm, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['LightGBM'] = results['lightgbm']
         
         # 7. Deep Learning Model
         print("Training Neural Network...")
@@ -104,17 +132,23 @@ class RealEstatePredictiveModels:
         )
         
         self.models['neural_network'] = nn
-        results['neural_network'] = self.evaluate_model(nn, X_test, y_test)
         
-        # Find best model
-        best_r2 = max(results.items(), key=lambda x: x[1]['r2_score'])
-        self.best_model_name = best_r2[0]
-        self.best_model = self.models[best_r2[0]]
+        if X_test is not None and y_test is not None:
+            results['neural_network'] = self.evaluate_model(nn, X_test, y_test)
+            # NEW: Store with display name
+            self.model_metrics['Neural Network'] = results['neural_network']
         
-        print(f"\nBest Model: {self.best_model_name} (R² = {best_r2[1]['r2_score']:.4f})")
+        # Find best model (only if we have results)
+        if results:
+            best_r2 = max(results.items(), key=lambda x: x[1]['r2_score'])
+            self.best_model_name = best_r2[0]
+            self.best_model = self.models[best_r2[0]]
+            
+            print(f"\nBest Model: {self.best_model_name} (R² = {best_r2[1]['r2_score']:.4f})")
         
         return results
     
+    # UPDATED: Add 'r2' alias for compatibility
     def evaluate_model(self, model, X_test, y_test):
         """Evaluate model performance"""
         y_pred = model.predict(X_test)
@@ -143,6 +177,7 @@ class RealEstatePredictiveModels:
             'rmse': rmse,
             'mae': mae,
             'r2_score': r2,
+            'r2': r2,  # NEW: Add alias for compatibility
             'mape': mape
         }
     
@@ -201,6 +236,40 @@ class RealEstatePredictiveModels:
                 self.models[name] = keras.models.load_model(f'{directory}{filename}')
         
         print(f"Loaded {len(self.models)} models")
+    
+    # NEW: Method for getting best model with display name
+    def get_best_model(self):
+        """Get the name of the best performing model (formatted for display)"""
+        if self.best_model_name is None:
+            return None
+        
+        # Convert internal names to display names
+        name_map = {
+            'linear_regression': 'Linear Regression',
+            'ridge': 'Ridge',
+            'random_forest': 'Random Forest',
+            'gradient_boosting': 'Gradient Boosting',
+            'xgboost': 'XGBoost',
+            'lightgbm': 'LightGBM',
+            'neural_network': 'Neural Network'
+        }
+        
+        return name_map.get(self.best_model_name, self.best_model_name)
+    
+    # NEW: Compatibility method for evaluation
+    def evaluate_all_models(self, X_test, y_test):
+        """Evaluate all trained models (compatibility method)"""
+        if self.model_metrics:
+            # Already evaluated during training
+            return self.model_metrics
+        
+        # Evaluate each model if not already done
+        for name, model in self.models.items():
+            display_name = name.replace('_', ' ').title()
+            metrics = self.evaluate_model(model, X_test, y_test)
+            self.model_metrics[display_name] = metrics
+        
+        return self.model_metrics
 
 # Example usage
 if __name__ == "__main__":

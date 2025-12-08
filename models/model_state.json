@@ -1,0 +1,23 @@
+{
+    "trained": true,
+    "feature_names": [
+        "area",
+        "bedrooms",
+        "bathrooms",
+        "stories",
+        "mainroad",
+        "guestroom",
+        "basement",
+        "hotwaterheating",
+        "airconditioning",
+        "parking",
+        "prefarea",
+        "furnishingstatus",
+        "bed_bath_ratio",
+        "facilities_score",
+        "area_category"
+    ],
+    "best_model": "Gradient Boosting",
+    "model_count": 7,
+    "training_date": "2025-12-07T15:46:40.482805"
+}

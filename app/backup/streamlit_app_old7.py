@@ -478,10 +478,6 @@ if 'chatbot' not in st.session_state:
         st.session_state.chatbot = None
         st.session_state.chat_history = []
 
-# Ensure chat_history exists even if chatbot doesn't
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-
 if 'preprocessor' not in st.session_state:
     st.session_state.preprocessor = RealEstateDataPreprocessor()
 
@@ -805,25 +801,7 @@ if page == "🏡 Home":
         with col_clear:
             if st.button("🗑️ Clear Data", key="clear_uploaded_data"):
                 st.session_state.preprocessor.data = None
-                if hasattr(st.session_state, 'data_just_uploaded'):
-                    st.session_state.data_just_uploaded = False
                 st.rerun()
-        
-        # Show next steps if data was just uploaded
-        if hasattr(st.session_state, 'data_just_uploaded') and st.session_state.data_just_uploaded:
-            st.markdown("---")
-            st.markdown("### 🎯 Next Steps:")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("📈 View Market Dashboard", key="goto_dashboard", use_container_width=True):
-                    st.session_state.data_just_uploaded = False
-                    st.session_state.current_page = "📈 Market Dashboard"
-                    st.rerun()
-            with col_b:
-                if st.button("🔮 Make Predictions", key="goto_prediction_home", use_container_width=True):
-                    st.session_state.data_just_uploaded = False
-                    st.session_state.current_page = "🔮 Price Prediction"
-                    st.rerun()
     else:
         uploaded_file = st.file_uploader(
             "Choose a CSV file",
@@ -860,8 +838,20 @@ if page == "🏡 Home":
                     # Store in preprocessor
                     if st.button("✅ Use This Data", key="confirm_upload", type="primary"):
                         st.session_state.preprocessor.data = df
-                        st.session_state.data_just_uploaded = True  # Flag for showing next steps
-                        st.rerun()
+                        st.success("🎉 Data loaded successfully! You can now use it in all pages.")
+                        st.balloons()
+                        
+                        # Suggest next steps
+                        st.markdown("### 🎯 Next Steps:")
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            if st.button("📈 View Market Dashboard", key="goto_dashboard"):
+                                st.session_state.current_page = "📈 Market Dashboard"
+                                st.rerun()
+                        with col_b:
+                            if st.button("🔮 Make Predictions", key="goto_prediction"):
+                                st.session_state.current_page = "🔮 Price Prediction"
+                                st.rerun()
                         
             except Exception as e:
                 st.error(f"❌ Error loading file: {str(e)}")

@@ -52,11 +52,11 @@ data/processed/*.csv
 *.sqlite
 
 # Model files
-models/saved_models/*.pkl
-models/saved_models/*.h5
-models/saved_models/*.joblib
-models/explainability/*.png
-models/explainability/*.pkl
+#models/saved_models/*.pkl
+#models/saved_models/*.h5
+#models/saved_models/*.joblib
+#models/explainability/*.png
+#models/explainability/*.pkl
 
 # Logs
 logs/

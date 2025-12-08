@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-# train_housing_models.py
+# train_housing_models.py - CORRECTED VERSION
 
 """
-Training script specifically for Housing.csv dataset
+Training script for Housing.csv dataset
 Trains all models and saves them for the Streamlit app
+Compatible with dynamic Model Insights page
 """
 
 import os
@@ -37,7 +38,7 @@ def main():
         df = pd.read_csv('Housing.csv')
         print(f"✓ Loaded {len(df)} records")
         print(f"✓ Columns: {list(df.columns)}")
-        print(f"✓ Price range: ${df['price'].min():,.0f} - ${df['price'].max():,.0f}")
+        print(f"✓ Price range: ₹{df['price'].min():,.0f} - ₹{df['price'].max():,.0f}")
     except FileNotFoundError:
         print("✗ Housing.csv not found in current directory!")
         print("Please ensure Housing.csv is in the same directory as this script.")
@@ -109,7 +110,7 @@ def main():
     X_scaled = scaler.fit_transform(X)
     X_scaled = pd.DataFrame(X_scaled, columns=feature_names)
     
-    # Train-test split
+    # Train-test split - CORRECTED IMPORT
     from sklearn.model_selection import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(
         X_scaled, y, test_size=0.2, random_state=42
@@ -118,18 +119,26 @@ def main():
     print(f"✓ Training set: {X_train.shape}")
     print(f"✓ Test set: {X_test.shape}")
     
-    # Save preprocessor objects
+    # Step 6: Save preprocessing objects
     print("\nStep 6: Saving preprocessing objects...")
     os.makedirs('models/saved_models', exist_ok=True)
     
     import joblib
     joblib.dump(scaler, 'models/saved_models/scaler.pkl')
     joblib.dump(feature_names, 'models/saved_models/feature_names.pkl')
+    
+    # Save train/test data for Model Insights explainability
+    joblib.dump(X_train, 'models/saved_models/X_train.pkl')
+    joblib.dump(X_test, 'models/saved_models/X_test.pkl')
+    joblib.dump(y_train, 'models/saved_models/y_train.pkl')
+    joblib.dump(y_test, 'models/saved_models/y_test.pkl')
+    
     print("✓ Saved scaler and feature names")
+    print("✓ Saved train/test data for explainability")
     
     # Step 7: Train all models
     print("\n" + "=" * 80)
-    print("Step 7: Training models...")
+    print("Step 7: Training all 7 models...")
     print("=" * 80 + "\n")
     
     results = models.train_all_models(X_train, y_train, X_test, y_test)
@@ -139,34 +148,49 @@ def main():
     print("TRAINING RESULTS")
     print("=" * 80 + "\n")
     
-    # Create results table
+    # Create results table using model_metrics (display names)
     results_data = []
-    for model_name, metrics in results.items():
-        results_data.append({
-            'Model': model_name.replace('_', ' ').title(),
-            'RMSE': f"${metrics['rmse']:,.0f}",
-            'MAE': f"${metrics['mae']:,.0f}",
-            'R² Score': f"{metrics['r2_score']:.4f}",
-            'MAPE': f"{metrics['mape']:.2f}%"
-        })
+    
+    if hasattr(models, 'model_metrics') and models.model_metrics:
+        for model_name, metrics in models.model_metrics.items():
+            results_data.append({
+                'Model': model_name,
+                'RMSE': f"₹{metrics.get('rmse', 0):,.0f}",
+                'MAE': f"₹{metrics.get('mae', 0):,.0f}",
+                'R² Score': f"{metrics.get('r2', metrics.get('r2_score', 0)):.4f}",
+                'MAPE': f"{metrics.get('mape', 0):.2f}%"
+            })
     
     results_df = pd.DataFrame(results_data)
     results_df = results_df.sort_values('R² Score', ascending=False)
-    print(results_df.to_string(index=False))
+    
+    # Pretty print table
+    print("┌" + "─" * 78 + "┐")
+    print(f"│ {'Model':<25} │ {'RMSE':<15} │ {'MAE':<15} │ {'R² Score':<10} │")
+    print("├" + "─" * 78 + "┤")
+    
+    for _, row in results_df.iterrows():
+        print(f"│ {row['Model']:<25} │ {row['RMSE']:<15} │ {row['MAE']:<15} │ {row['R² Score']:<10} │")
+    
+    print("└" + "─" * 78 + "┘")
+    
+    # Display best model
+    best_model_display = models.get_best_model()
+    best_metrics = models.model_metrics[best_model_display]
     
     print(f"\n{'=' * 80}")
-    print(f"🏆 BEST MODEL: {models.best_model_name.upper()}")
-    print(f"   R² Score: {results[models.best_model_name]['r2_score']:.4f}")
-    print(f"   RMSE: ${results[models.best_model_name]['rmse']:,.0f}")
-    print(f"   MAE: ${results[models.best_model_name]['mae']:,.0f}")
+    print(f"🏆 BEST MODEL: {best_model_display.upper()}")
+    print(f"   R² Score: {best_metrics.get('r2', best_metrics.get('r2_score', 0)):.4f}")
+    print(f"   RMSE: ₹{best_metrics.get('rmse', 0):,.0f}")
+    print(f"   MAE: ₹{best_metrics.get('mae', 0):,.0f}")
     print(f"{'=' * 80}")
     
     # Step 9: Save models
     print("\nStep 8: Saving trained models...")
     models.save_models('models/saved_models/')
-    print("✓ All models saved")
+    print("✓ All 7 models saved successfully")
     
-    # Step 10: Save results
+    # Step 10: Save comprehensive results
     print("\nStep 9: Saving training results...")
     
     results_dict = {
@@ -176,16 +200,17 @@ def main():
         'training_records': len(X_train),
         'test_records': len(X_test),
         'features': feature_names,
-        'best_model': models.best_model_name,
+        'best_model': best_model_display,
         'models': {}
     }
     
-    for model_name, metrics in results.items():
+    # Save results with display names
+    for model_name, metrics in models.model_metrics.items():
         results_dict['models'][model_name] = {
-            'rmse': float(metrics['rmse']),
-            'mae': float(metrics['mae']),
-            'r2_score': float(metrics['r2_score']),
-            'mape': float(metrics['mape'])
+            'rmse': float(metrics.get('rmse', 0)),
+            'mae': float(metrics.get('mae', 0)),
+            'r2_score': float(metrics.get('r2', metrics.get('r2_score', 0))),
+            'mape': float(metrics.get('mape', 0))
         }
     
     with open('models/training_results.json', 'w') as f:
@@ -193,13 +218,27 @@ def main():
     
     print("✓ Results saved to models/training_results.json")
     
+    # Save model state for Streamlit quick-load
+    model_state = {
+        'trained': True,
+        'feature_names': feature_names,
+        'best_model': best_model_display,
+        'model_count': len(models.models),
+        'training_date': datetime.now().isoformat()
+    }
+    
+    with open('models/model_state.json', 'w') as f:
+        json.dump(model_state, f, indent=4)
+    
+    print("✓ Model state saved for Streamlit quick-load")
+    
     # Step 11: Generate sample predictions
     print("\n" + "=" * 80)
     print("SAMPLE PREDICTIONS")
     print("=" * 80 + "\n")
     
     # Get 5 random test samples
-    indices = np.random.choice(len(X_test), 5, replace=False)
+    indices = np.random.choice(len(X_test), min(5, len(X_test)), replace=False)
     
     for i, idx in enumerate(indices, 1):
         actual = y_test.iloc[idx]
@@ -207,24 +246,38 @@ def main():
         error = predicted - actual
         error_pct = (error / actual) * 100
         
+        # Get original features for display
+        original_idx = y_test.index[idx]
+        
         print(f"Property {i}:")
-        print(f"  Area: {int(df.iloc[y_test.index[idx]]['area'])} sq ft")
-        print(f"  Bedrooms: {int(df.iloc[y_test.index[idx]]['bedrooms'])}")
-        print(f"  Bathrooms: {int(df.iloc[y_test.index[idx]]['bathrooms'])}")
-        print(f"  Actual Price:    ${actual:,.0f}")
-        print(f"  Predicted Price: ${predicted:,.0f}")
-        print(f"  Error:           ${error:,.0f} ({error_pct:+.1f}%)")
+        print(f"  Area: {int(df.loc[original_idx, 'area'])} sq ft")
+        print(f"  Bedrooms: {int(df.loc[original_idx, 'bedrooms'])}")
+        print(f"  Bathrooms: {int(df.loc[original_idx, 'bathrooms'])}")
+        print(f"  Actual Price:    ₹{actual:,.0f}")
+        print(f"  Predicted Price: ₹{predicted:,.0f}")
+        print(f"  Error:           ₹{error:,.0f} ({error_pct:+.1f}%)")
         print()
     
     # Final summary
     print("=" * 80)
-    print("TRAINING COMPLETE!")
+    print("✅ TRAINING COMPLETE!")
     print("=" * 80)
-    print(f"\n✓ Models saved in: models/saved_models/")
-    print(f"✓ Best model: {models.best_model_name}")
-    print(f"✓ Ready for deployment!")
-    print(f"\nNext step: Run the Streamlit app with:")
-    print(f"  streamlit run app/streamlit_app.py")
+    print(f"\n📦 Files saved:")
+    print(f"   ✓ models/saved_models/ - All 7 models + training data")
+    print(f"   ✓ models/training_results.json - Performance metrics")
+    print(f"   ✓ models/model_state.json - Quick-load state")
+    print(f"\n🏆 Best model: {best_model_display}")
+    print(f"💾 Training data saved for explainability")
+    print(f"⚡ Model state saved for quick loading")
+    print(f"✨ Ready for deployment!")
+    print(f"\n📊 Model Insights Integration Status:")
+    print(f"   ✓ Dynamic feature importance ready")
+    print(f"   ✓ Real-time performance metrics ready")
+    print(f"   ✓ SHAP explainability data ready")
+    print(f"\n🚀 Next Steps:")
+    print(f"   1. Run: streamlit run app/streamlit_app.py")
+    print(f"   2. Navigate to '📊 Model Insights'")
+    print(f"   3. Models should load automatically!")
     print("\n" + "=" * 80)
 
 if __name__ == "__main__":

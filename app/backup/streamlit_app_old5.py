@@ -478,10 +478,6 @@ if 'chatbot' not in st.session_state:
         st.session_state.chatbot = None
         st.session_state.chat_history = []
 
-# Ensure chat_history exists even if chatbot doesn't
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-
 if 'preprocessor' not in st.session_state:
     st.session_state.preprocessor = RealEstateDataPreprocessor()
 
@@ -781,92 +777,6 @@ if page == "🏡 Home":
         """, unsafe_allow_html=True)
     
     # CTA
-    st.markdown("---")
-    
-    # Data Upload Section
-    st.markdown("<h2>📤 Upload Your Property Data</h2>", unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-card">
-        <p style="margin:0; font-size:1rem;">
-            Upload your property dataset (CSV format) to unlock personalized analytics 
-            and see your real market data in the dashboard!
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Check if data is already loaded
-    if hasattr(st.session_state.preprocessor, 'data') and st.session_state.preprocessor.data is not None:
-        st.success(f"✅ Data loaded: **{len(st.session_state.preprocessor.data)} properties** in your dataset")
-        
-        col_info, col_clear = st.columns([3, 1])
-        with col_info:
-            st.info("💡 Your data is being used in Market Dashboard and other analytics")
-        with col_clear:
-            if st.button("🗑️ Clear Data", key="clear_uploaded_data"):
-                st.session_state.preprocessor.data = None
-                if hasattr(st.session_state, 'data_just_uploaded'):
-                    st.session_state.data_just_uploaded = False
-                st.rerun()
-        
-        # Show next steps if data was just uploaded
-        if hasattr(st.session_state, 'data_just_uploaded') and st.session_state.data_just_uploaded:
-            st.markdown("---")
-            st.markdown("### 🎯 Next Steps:")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("📈 View Market Dashboard", key="goto_dashboard", use_container_width=True):
-                    st.session_state.data_just_uploaded = False
-                    st.session_state.current_page = "📈 Market Dashboard"
-                    st.rerun()
-            with col_b:
-                if st.button("🔮 Make Predictions", key="goto_prediction_home", use_container_width=True):
-                    st.session_state.data_just_uploaded = False
-                    st.session_state.current_page = "🔮 Price Prediction"
-                    st.rerun()
-    else:
-        uploaded_file = st.file_uploader(
-            "Choose a CSV file",
-            type=['csv'],
-            help="Upload a CSV file containing property data with columns like: price, area, bedrooms, bathrooms, etc.",
-            key="home_data_upload"
-        )
-        
-        if uploaded_file is not None:
-            try:
-                with st.spinner("📊 Loading your data..."):
-                    # Read the CSV
-                    df = pd.read_csv(uploaded_file)
-                    
-                    st.success(f"✅ Successfully loaded **{len(df)} properties** with **{len(df.columns)} features**!")
-                    
-                    # Show preview
-                    with st.expander("👀 Preview Data (first 5 rows)"):
-                        st.dataframe(df.head())
-                    
-                    # Show column info
-                    with st.expander("📋 Dataset Information"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.markdown("**Columns:**")
-                            for col in df.columns:
-                                st.write(f"- {col}")
-                        with col2:
-                            st.markdown("**Statistics:**")
-                            st.write(f"- Total Rows: {len(df)}")
-                            st.write(f"- Total Columns: {len(df.columns)}")
-                            st.write(f"- Missing Values: {df.isnull().sum().sum()}")
-                    
-                    # Store in preprocessor
-                    if st.button("✅ Use This Data", key="confirm_upload", type="primary"):
-                        st.session_state.preprocessor.data = df
-                        st.session_state.data_just_uploaded = True  # Flag for showing next steps
-                        st.rerun()
-                        
-            except Exception as e:
-                st.error(f"❌ Error loading file: {str(e)}")
-                st.info("💡 Make sure your CSV file is properly formatted with headers.")
-    
     st.markdown("---")
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
@@ -1961,7 +1871,7 @@ elif page == "🤖 AI Assistant":
             
             3. **Restart App:**
                ```bash
-               streamlit run streamlit_app.py
+               streamlit run app/streamlit_app.py
                ```
             """)
     
@@ -2048,17 +1958,12 @@ elif page == "🤖 AI Assistant":
             
             st.rerun()
         
-        # Clear chat button
-        if st.button("🗑️ Clear Chat", key="clear_chat"):
-            st.session_state.chat_history = []
-            st.rerun()
-        
         # Context-Aware Quick Actions
         st.markdown("---")
         st.markdown("<h3>💡 Smart Questions (Context-Aware)</h3>", unsafe_allow_html=True)
         
         # Check if we have prediction or analysis context
-        has_prediction = st.session_state.shared_context.get('last_prediction') is not None
+        has_prediction = get_page_state('prediction_made', False)
         has_analysis = st.session_state.chatbot.context.get('analysis_results') is not None
         
         if has_prediction or has_analysis:
@@ -2113,18 +2018,26 @@ elif page == "🤖 AI Assistant":
         cols = st.columns(3)
         for idx, question in enumerate(general_questions):
             with cols[idx % 3]:
-                if st.button(f"📚 {question}", key=f"gen_q_{idx}", use_container_width=True):
+                if st.button(question, key=f"gen_q_{idx}", use_container_width=True):
                     st.session_state.chat_history.append({
                         'role': 'user',
                         'content': question
                     })
-                    with st.spinner("🤔 Thinking..."):
-                        response = st.session_state.chatbot.chat(question)
+                    response = st.session_state.chatbot.chat(question)
                     st.session_state.chat_history.append({
                         'role': 'assistant',
                         'content': response
                     })
                     st.rerun()
+        
+        # Clear chat
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            if st.button("🔄 Clear Chat History", use_container_width=True):
+                st.session_state.chat_history = []
+                st.session_state.chatbot.reset_conversation()
+                st.rerun()
 
 elif page == "📈 Market Dashboard":
     st.markdown("<h1>📈 Market Analytics Dashboard</h1>", unsafe_allow_html=True)
