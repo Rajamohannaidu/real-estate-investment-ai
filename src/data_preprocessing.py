@@ -135,6 +135,7 @@ class RealEstateDataPreprocessor:
         df['price'] = df['price'].clip(lower=100000)
         
         return df
+    
 
 # Example usage
 if __name__ == "__main__":

@@ -231,8 +231,8 @@ class ModelExplainability:
 
 # Example usage
 if __name__ == "__main__":
-    from data_preprocessing import RealEstateDataPreprocessor
-    from predictive_models import RealEstatePredictiveModels
+    from src.data_preprocessing import RealEstateDataPreprocessor
+    from src.predictive_models import RealEstatePredictiveModels
     
     # Load data
     preprocessor = RealEstateDataPreprocessor()

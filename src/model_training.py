@@ -12,8 +12,8 @@ import numpy as np
 from datetime import datetime
 import json
 
-from data_preprocessing import RealEstateDataPreprocessor
-from predictive_models import RealEstatePredictiveModels
+from src.data_preprocessing import RealEstateDataPreprocessor
+from src.predictive_models import RealEstatePredictiveModels
 
 class ModelTrainingPipeline:
     """Complete pipeline for training and evaluating models"""

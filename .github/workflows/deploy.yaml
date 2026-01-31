@@ -3,10 +3,10 @@ name: Deploy to Cloud Run
 on:
   push:
     branches: ["main"]
-  workflow_dispatch: 
+  workflow_dispatch:
 
 env:
-  PROJECT_ID: academic-atlas-475811-c5
+  PROJECT_ID: project-c2023f82-4f20-4fee-b94
   REGION: us-central1
   REPOSITORY: realestate-repo
   SERVICE_NAME: realestate
@@ -16,14 +16,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write # ⭐ REQUIRED for Workload Identity Federation
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      # ✅ KEYLESS AUTHENTICATION
+      - name: Authenticate to Google Cloud (WIF)
+        id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: "projects/68321934190/locations/global/workloadIdentityPools/mlops-pool/providers/github-provider"
+          service_account: "mlops-sa@project-c2023f82-4f20-4fee-b94.iam.gserviceaccount.com"
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
@@ -31,15 +38,19 @@ jobs:
           project_id: ${{ env.PROJECT_ID }}
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+        run: |
+          gcloud auth configure-docker \
+          ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest .
+          docker build -t \
+          ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest .
 
       - name: Push Docker image
         run: |
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+          docker push \
+          ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Deploy to Cloud Run
         run: |

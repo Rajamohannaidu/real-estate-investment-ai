@@ -1,0 +1,70 @@
+{
+    "training_date": "2026-01-04T18:47:38.715113",
+    "dataset": "Housing.csv",
+    "total_records": 545,
+    "training_records": 436,
+    "test_records": 109,
+    "features": [
+        "area",
+        "bedrooms",
+        "bathrooms",
+        "stories",
+        "mainroad",
+        "guestroom",
+        "basement",
+        "hotwaterheating",
+        "airconditioning",
+        "parking",
+        "prefarea",
+        "furnishingstatus",
+        "price_per_sqft",
+        "bed_bath_ratio",
+        "facilities_score",
+        "area_category"
+    ],
+    "best_model": "Gradient Boosting",
+    "models": {
+        "Random Forest": {
+            "rmse": 582126.1745236819,
+            "mae": 291184.2901376147,
+            "r2_score": 0.932957528227127,
+            "mape": 5.546280078881536
+        },
+        "XGBoost": {
+            "rmse": 538066.5743376657,
+            "mae": 278758.2270642202,
+            "r2_score": 0.9427220225334167,
+            "mape": 5.225420803747516
+        },
+        "Gradient Boosting": {
+            "rmse": 475274.6527124735,
+            "mae": 247758.88392854185,
+            "r2_score": 0.955310543824444,
+            "mape": 4.5797445252404385
+        },
+        "LightGBM": {
+            "rmse": 515193.85640393547,
+            "mae": 297134.69748078845,
+            "r2_score": 0.9474881747132675,
+            "mape": 5.7291799019572345
+        },
+        "Ridge": {
+            "rmse": 797986.2493564503,
+            "mae": 537827.4875909821,
+            "r2_score": 0.8740185568455437,
+            "mape": 10.960777156615462
+        },
+        "Linear Regression": {
+            "rmse": 802283.4637982608,
+            "mae": 540464.4416132045,
+            "r2_score": 0.8726580648972693,
+            "mape": 11.06174551075601
+        },
+        "Neural Network": {
+            "rmse": 1290189.3970040276,
+            "mae": 967766.4380733945,
+            "r2_score": 0.670676589012146,
+            "mape": 21.337354755823903
+        }
+    }
+}

@@ -13,6 +13,9 @@ from plotly.subplots import make_subplots
 import sys
 import os
 from datetime import datetime
+import tensorflow as tf
+from pathlib import Path
+
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +29,49 @@ try:
     from src.chatbot import RealEstateInvestmentChatbot
 except:
     RealEstateInvestmentChatbot = None
+
+# Enhanced SafeFormatter
+class SafeFormatter:
+    """Safely format any numeric type including numpy arrays"""
+    
+    @staticmethod
+    def to_float(value):
+        """Convert to float safely"""
+        if value is None:
+            return 0.0
+        if isinstance(value, (np.ndarray, pd.Series)):
+            if isinstance(value, pd.Series):
+                return float(value.iloc[0]) if len(value) > 0 else 0.0
+            else:
+                return float(value.flat[0]) if value.size > 0 else 0.0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+    
+    @staticmethod
+    def format_currency(value, prefix="₹"):
+        """Format as currency"""
+        return f"{prefix}{SafeFormatter.to_float(value):,.0f}"
+    
+    @staticmethod
+    def format_percent(value, decimals=1):
+        """Format as percentage"""
+        return f"{SafeFormatter.to_float(value):.{decimals}%}"
+    
+    @staticmethod
+    def format_number(value, decimals=2):
+        """Format as number"""
+        return f"{SafeFormatter.to_float(value):.{decimals}f}"
+
+# Create instance
+sf = SafeFormatter()
+
+# Helper function for inline conversion
+def safe(value):
+    """Convert numpy arrays to float for safe formatting"""
+    return sf.to_float(value)
+
 
 def load_pretrained_models():
     """Load pre-trained models with correct name mapping and real metrics."""
@@ -84,6 +130,26 @@ def load_pretrained_models():
             print(f"  ✅ Loaded {model_file}")
         except Exception as e:
             print(f"  ⚠️ Failed to load {model_file}: {e}")
+    
+        # === LOAD NEURAL NETWORK FROM .h5 FILE (Keras/TensorFlow) ===
+    nn_h5_path = models_dir / "neural_network.h5"
+    nn_dir_path = models_dir / "neural_network"  # fallback if saved as directory
+
+    if nn_h5_path.exists():
+        try:
+            models.models["neural_network"] = tf.keras.models.load_model(nn_h5_path)
+            print("  ✅ Loaded neural_network (from neural_network.h5)")
+        except Exception as e:
+            print(f"  ⚠️ Failed to load neural_network.h5: {e}")
+    elif nn_dir_path.exists() and nn_dir_path.is_dir():
+        try:
+            models.models["neural_network"] = tf.keras.models.load_model(nn_dir_path)
+            print("  ✅ Loaded neural_network (from directory)")
+        except Exception as e:
+            print(f"  ⚠️ Failed to load neural_network directory: {e}")
+    else:
+        print("  ⚠️ neural_network model not found (.h5 or directory missing)")
+    # ============================================================
 
     # Load training_results.json
     training_results_path = models_dir.parent / 'training_results.json'
@@ -115,7 +181,7 @@ def load_pretrained_models():
         display_name = internal_to_display.get(internal_name, None)
 
         if display_name and display_name in results["models"]:
-            models.model_metrics[internal_name] = results["models"][display_name]
+            models.model_metrics[display_name] = results["models"][display_name]
             print(f"  📊 Loaded metrics for {internal_name} (from {display_name})")
         else:
             print(f"  ⚠️ Metrics missing for {internal_name} — skipping.")
@@ -669,7 +735,7 @@ if page == "🏡 Home":
                 <li>Random Forest</li>
                 <li>XGBoost</li>
                 <li>Neural Networks</li>
-                <li>80%+ Accuracy</li>
+                <li>~80%+ Accuracy</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -726,7 +792,7 @@ if page == "🏡 Home":
     with col3:
         st.markdown("""
         <div class="metric-card">
-            <h3 style="color:white; margin:0;">80%+</h3>
+            <h3 style="color:white; margin:0;">80%</h3>
             <p style="margin:0; opacity:0.9;">Prediction Accuracy</p>
         </div>
         """, unsafe_allow_html=True)
@@ -955,50 +1021,138 @@ elif page == "🔮 Price Prediction":
             set_page_state('prediction_made', True)
             
         if get_page_state('prediction_made', False):
-            with st.spinner("🔄 Analyzing property..."):
-                # Convert to binary
-                mainroad_val = 1 if mainroad == "Yes" else 0
-                guestroom_val = 1 if guestroom == "Yes" else 0
-                basement_val = 1 if basement == "Yes" else 0
-                hotwaterheating_val = 1 if hotwaterheating == "Yes" else 0
-                airconditioning_val = 1 if airconditioning == "Yes" else 0
-                prefarea_val = 1 if prefarea == "Yes" else 0
-                
-                furnishing_map = {'Furnished': 2, 'Semi-Furnished': 1, 'Unfurnished': 0}
-                furnishing_val = furnishing_map[furnishing]
-                
-                # Calculate derived features
-                bed_bath_ratio = bedrooms / (bathrooms + 1)
-                facilities_score = (mainroad_val + guestroom_val + basement_val + 
-                                  hotwaterheating_val + airconditioning_val)
-                
-                # Area category
-                if area <= 3000:
-                    area_category = 0
-                elif area <= 6000:
-                    area_category = 1
-                elif area <= 10000:
-                    area_category = 2
-                else:
-                    area_category = 3
-                
-                # Simple prediction formula
-                base_price = (
-                    area * 800 +
-                    bedrooms * 500000 +
-                    bathrooms * 300000 +
-                    stories * 200000 +
-                    mainroad_val * 400000 +
-                    guestroom_val * 300000 +
-                    basement_val * 250000 +
-                    hotwaterheating_val * 200000 +
-                    airconditioning_val * 350000 +
-                    parking * 150000 +
-                    prefarea_val * 500000 +
-                    furnishing_val * 300000
-                )
-                
-                predicted_price = base_price
+            with st.spinner("🔄 Analyzing property with AI models..."):
+                try:
+                    # Convert to binary
+                    mainroad_val = 1 if mainroad == "Yes" else 0
+                    guestroom_val = 1 if guestroom == "Yes" else 0
+                    basement_val = 1 if basement == "Yes" else 0
+                    hotwaterheating_val = 1 if hotwaterheating == "Yes" else 0
+                    airconditioning_val = 1 if airconditioning == "Yes" else 0
+                    prefarea_val = 1 if prefarea == "Yes" else 0
+                    
+                    furnishing_map = {'Furnished': 2, 'Semi-Furnished': 1, 'Unfurnished': 0}
+                    furnishing_val = furnishing_map[furnishing]
+                    
+                    # Calculate derived features (matching training)
+                    price_per_sqft = 1000 # Will be calculated after prediction
+                    bed_bath_ratio = bedrooms / (bathrooms + 1)
+                    facilities_score = (mainroad_val + guestroom_val + basement_val + 
+                                      hotwaterheating_val + airconditioning_val)
+                    
+                    # Area category
+                    if area <= 3000:
+                        area_category = 0
+                    elif area <= 6000:
+                        area_category = 1
+                    elif area <= 10000:
+                        area_category = 2
+                    else:
+                        area_category = 3
+                    
+                    # Create feature DataFrame matching training format
+                    # Load feature names from saved models
+                    import joblib
+                    try:
+                        feature_names = joblib.load('models/saved_models/feature_names.pkl')
+                    except:
+                        # Fallback to session state
+                        feature_names = st.session_state.feature_names if hasattr(st.session_state, 'feature_names') else None
+                    
+                    if feature_names is not None:
+                        # Create features in the exact same order as training
+                        #area_per_bedroom = area / max(bedrooms, 1)
+                        #bathroom_density = bathrooms / max(bedrooms, 1)
+                        #rooms_per_story = bedrooms / max(stories, 1)
+                        #amenity_ratio = facilities_score / 5
+                        
+                        features_dict = {
+                            'area': area,
+                            'bedrooms': bedrooms,
+                            'bathrooms': bathrooms,
+                            'stories': stories,
+                            'mainroad': mainroad_val,
+                            'guestroom': guestroom_val,
+                            'basement': basement_val,
+                            'hotwaterheating': hotwaterheating_val,
+                            'airconditioning': airconditioning_val,
+                            'parking': parking,
+                            'prefarea': prefarea_val,
+                            'furnishingstatus': furnishing_val,
+                            'price_per_sqft': price_per_sqft, 
+                            'bed_bath_ratio': bed_bath_ratio,
+                            'facilities_score': facilities_score,
+                            'area_category': area_category
+                        }
+                        
+                        # Handle price_per_sqft if it exists in features
+                        if 'price_per_sqft' in feature_names:
+                            features_dict['price_per_sqft'] = price_per_sqft
+
+                        # Create DataFrame with features in correct order
+                        input_features = pd.DataFrame([features_dict])
+                        # Ensure all required features are present
+                        if feature_names is not None:
+                           #missing_features = set(feature_names) - set(input_features.columns)
+                           #if missing_features:
+                           #   for feat in missing_features:
+                           #      input_features[feat] = 0
+                           missing_features = set(feature_names) - set(input_features.columns)
+                           if missing_features:
+                               st.error(f"❌ Feature mismatch detected. Missing features: {missing_features}")
+                               st.stop()
+                        
+                        # Reorder to match training
+                        #input_features = input_features[[col for col in feature_names if col in input_features.columns]]
+                        input_features = input_features[feature_names]
+                        
+                        # Load scaler and scale features
+                        try:
+                            #scaler = joblib.load('models/saved_models/scaler.pkl')
+                            scaler_path = None
+                            for base in [Path.cwd(), Path(__file__).parent.parent]:
+                                candidate = base / 'models' / 'saved_models' / 'scaler.pkl'
+                                if candidate.exists():
+                                    scaler_path = candidate
+                                    break
+                            if scaler_path is None:
+                                st.error("❌ Scaler not found. Ensure scaler.pkl exists.")
+                                st.stop()
+                            scaler = joblib.load(scaler_path)
+                            input_features_scaled = pd.DataFrame(
+                                scaler.transform(input_features),
+                                columns=input_features.columns
+                            )
+                        except:
+                            # If scaler not found, use unscaled (not ideal but works)
+                            input_features_scaled = input_features.copy()
+                            st.warning("⚠️ Scaler not found, using unscaled features")
+                        
+                        # Make prediction with best model
+                        if st.session_state.models.best_model is not None:
+                            # Check if it's a neural network
+                            if hasattr(st.session_state.models.best_model, 'predict') and 'keras' in str(type(st.session_state.models.best_model)).lower():
+                                #predicted_price = float(st.session_state.models.best_model.predict(input_features_scaled, verbose=0)[0][0])
+                                raw_pred = st.session_state.models.best_model.predict(input_features_scaled, verbose=0)
+                                predicted_price = float(np.ravel(raw_pred)[0])
+                            else:
+                                predicted_price = float(st.session_state.models.best_model.predict(input_features_scaled)[0])
+                        else:
+                            st.error("❌ ML models are not loaded. Please train or load models before prediction.")
+                            st.stop()
+                    else:
+                        st.error("❌ Feature metadata missing. Prediction aborted.")
+                        st.stop()
+                     
+                    
+                except Exception as e:
+                    st.error(f"Prediction error: {e}")
+                    import traceback
+                    with st.expander("Show error details"):
+                        st.code(traceback.format_exc())
+                   
+                    st.error("❌ Prediction failed due to an internal error. Please retry.")
+                    st.stop()
                 
                 # Store in page-specific state
                 set_page_state('predicted_price', predicted_price)
@@ -1010,7 +1164,7 @@ elif page == "🔮 Price Prediction":
                 set_page_state('prediction_furnishing', furnishing)
                 set_page_state('prediction_furnishing_val', furnishing_val)
                 
-                # ALSO store in shared context for cross-page access (e.g., Model Insights)
+                # CRITICAL: Store in shared context with input features for SHAP
                 st.session_state.shared_context['last_prediction'] = {
                     'predicted_price': predicted_price,
                     'area': area,
@@ -1025,7 +1179,8 @@ elif page == "🔮 Price Prediction":
                     'basement': basement,
                     'hotwaterheating': hotwaterheating,
                     'airconditioning': airconditioning,
-                    'prefarea': prefarea
+                    'prefarea': prefarea,
+                    'input_features_df': input_features_scaled  # ADDED FOR SHAP
                 }
                 
                 # Update chatbot context
@@ -1043,6 +1198,7 @@ elif page == "🔮 Price Prediction":
                         'prefarea': prefarea
                     }
                     st.session_state.chatbot.set_property_context(property_context)
+
                 
                 # Success message
                 st.markdown(f"""
@@ -1050,13 +1206,12 @@ elif page == "🔮 Price Prediction":
                     <h2 style="margin:0; color:#065f46;">✅ Prediction Complete!</h2>
                 </div>
                 """, unsafe_allow_html=True)
-                
+                st.success("🤖 ML Model Prediction (Best Model Loaded)")
                 # Price Display
                 col_x, col_y, col_z = st.columns(3)
                 
                 with col_x:
-                    st.metric("💰 Predicted Price", 
-                             f"₹{predicted_price:,.0f}",
+                    st.metric("💰 Predicted Price", sf.format_currency(predicted_price),
                              delta="Market Value")
                 
                 with col_y:
@@ -1065,10 +1220,27 @@ elif page == "🔮 Price Prediction":
                              delta=f"{((predicted_price/area)/1000):.1f}K/sqft")
                 
                 with col_z:
-                    confidence = 85  # Example confidence
-                    st.metric("🎯 Confidence", 
-                             f"{confidence}%",
-                             delta="High Accuracy")
+                    #confidence = 85  # Example confidence
+                    best_model_internal = st.session_state.models.get_best_model()
+                    internal_to_display = {
+                            "linear_regression": "Linear Regression",
+                            "ridge": "Ridge",
+                            "random_forest": "Random Forest",
+                            "gradient_boosting": "Gradient Boosting",
+                            "xgboost": "XGBoost",
+                            "lightgbm": "LightGBM",
+                            "neural_network": "Neural Network"
+                    }
+                    best_model_display = internal_to_display.get(best_model_internal)
+                    r2 = st.session_state.models.model_metrics.get(
+                        best_model_display, {}
+                    ).get('r2_score', 0.85)
+                    confidence = int(r2 * 100)
+                    st.metric(
+                        "🎯 Model R² (%)",
+                        f"{confidence}%",
+                        delta="Explained Variance"
+                    )
                 
                 # Property Summary
                 st.markdown("<h4>📋 Property Summary</h4>", unsafe_allow_html=True)
@@ -1293,7 +1465,7 @@ elif page == "💰 Investment Analysis":
                     st.metric(
                         "💹 ROI", 
                         f"{analysis['roi']['roi_percentage']:.2f}%",
-                        delta=f"₹{analysis['roi']['net_profit']:,.0f} profit"
+                        delta=f"₹{safe(analysis['roi']['net_profit']):,.0f} profit"
                     )
                     
                     st.metric(
@@ -1306,13 +1478,13 @@ elif page == "💰 Investment Analysis":
                     st.metric(
                         "🏠 Rental Yield", 
                         f"{analysis['rental_yield']['net_yield_percentage']:.2f}%",
-                        delta=f"₹{analysis['rental_yield']['net_annual_income']:,.0f}/year"
+                        delta=f"₹{safe(analysis['rental_yield']['net_annual_income']):,.0f}/year"
                     )
                     
                     st.metric(
                         "💰 Cash Flow", 
-                        f"₹{analysis['cash_flow']['annual_cash_flow']:,.0f}",
-                        delta=f"₹{analysis['cash_flow']['monthly_cash_flow']:,.0f}/month"
+                        f"₹{safe(analysis['cash_flow']['annual_cash_flow']):,.0f}",
+                        delta=f"₹{safe(analysis['cash_flow']['monthly_cash_flow']):,.0f}/month"
                     )
                 
                 # Progress Bar for Investment Score
@@ -1356,7 +1528,7 @@ elif page == "💰 Investment Analysis":
                 x=categories,
                 y=values,
                 marker=dict(color=colors),
-                text=[f"₹{abs(v):,.0f}" for v in values],
+                text=[f"₹{safe(abs(v)):,.0f}" for v in values],
                 textposition='outside'
             ))
             
@@ -1424,16 +1596,16 @@ elif page == "💰 Investment Analysis":
                 f"₹{purchase_price * (down_payment/100):,.0f}",
                 f"₹{annual_rental:,.0f}",
                 f"₹{operating_expenses:,.0f}",
-                f"₹{analysis['cash_flow']['annual_cash_flow']:,.0f}",
-                f"{analysis['break_even']['break_even_years']:.1f} years" if analysis['break_even']['break_even_years'] else "N/A",
-                f"{analysis['roi']['roi_percentage']:.2f}%",
-                f"₹{analysis['roi']['future_property_value']:,.0f}"
+                f"₹{safe(analysis['cash_flow']['annual_cash_flow']):,.0f}",
+                f"{safe(analysis['break_even']['break_even_years']):.1f} years" if safe(analysis['break_even']['break_even_years']) else "N/A",
+                f"{safe(analysis['roi']['roi_percentage']):.2f}%",
+                f"₹{safe(analysis['roi']['future_property_value']):,.0f}"
             ],
             "Status": [
                 "💰", "💵", "📈", "📉", 
-                "✅" if analysis['cash_flow']['annual_cash_flow'] > 0 else "⚠️",
-                "✅" if analysis['break_even']['break_even_years'] and analysis['break_even']['break_even_years'] < 10 else "⚠️",
-                "✅" if analysis['roi']['roi_percentage'] > 30 else "⚠️",
+                "✅" if safe(analysis['cash_flow']['annual_cash_flow']) > 0 else "⚠️",
+                "✅" if safe(analysis['break_even']['break_even_years']) and safe(analysis['break_even']['break_even_years']) < 10 else "⚠️",
+                "✅" if safe(analysis['roi']['roi_percentage']) > 30 else "⚠️",
                 "📊"
             ]
         }
@@ -1780,7 +1952,7 @@ elif page == "📊 Model Insights":
             st.info("👆 Please train models first to see performance metrics")
     
     with tab3:
-        st.markdown("<h3>🔍 Prediction Explainability</h3>", unsafe_allow_html=True)
+        st.markdown("<h3>🔍 Prediction Explainability with SHAP</h3>", unsafe_allow_html=True)
         
         # Check if prediction exists in shared context
         has_prediction = st.session_state.shared_context.get('last_prediction') is not None
@@ -1812,7 +1984,8 @@ elif page == "📊 Model Insights":
                 if st.session_state.models.model_metrics and best_model_display in st.session_state.models.model_metrics:
                     r2 = st.session_state.models.model_metrics[best_model_display].get('r2', 
                         st.session_state.models.model_metrics[best_model_display].get('r2_score', 0))
-                    st.metric("Accuracy", f"{r2:.1%}")
+                    #st.metric("Accuracy", f"{r2:.1%}")
+                    st.metric("Model R² Score", f"{r2:.3f}")
             
             st.markdown("---")
             
@@ -1842,13 +2015,211 @@ elif page == "📊 Model Insights":
                 """)
             
             st.markdown("---")
-            st.info("💡 Full SHAP analysis integrated with your existing explainability.py - Ready for deep dive analysis!")
             
+            # NEW: SHAP Explainability Analysis
+            st.markdown("### 🎯 SHAP Feature Contribution Analysis")
+            
+            # Check if we have the input features DataFrame
+            if 'input_features_df' in prediction_data:
+                try:
+                    import shap
+                    import matplotlib.pyplot as plt
+                    
+                    input_features = prediction_data['input_features_df']
+                    
+                    # Create explainer based on model type
+                    with st.spinner("Calculating SHAP values..."):
+                        model_type = str(type(best_model).__name__).lower()
+                        
+                        # Determine which explainer to use
+                        #if any(x in model_type for x in ['tree', 'forest', 'boosting', 'xgb', 'lgbm']):
+                        if hasattr(best_model, 'feature_importances_'):
+                            explainer = shap.TreeExplainer(best_model)
+                            shap_values = explainer.shap_values(input_features)                        
+
+                        else:
+                            # Kernel explainer (works for any model but slower)
+                            if hasattr(st.session_state, 'X_train') and st.session_state.X_train is not None:
+                                background = shap.sample(st.session_state.X_train, 100)
+                            else:
+                                # Fallback: use test data
+                                import joblib
+                                X_train = joblib.load('models/saved_models/X_train.pkl')
+                                background = shap.sample(X_train, 100)
+                            
+                            explainer = shap.Explainer(best_model.predict, background)
+                            shap_values = explainer(input_features)
+                    
+                    # Display SHAP waterfall plot
+                    st.markdown("**🌊 SHAP Waterfall Plot** - Shows how each feature pushes the prediction higher or lower")
+                    
+                    try:
+                        fig, ax = plt.subplots(figsize=(10, 8))
+                        
+                        # Handle different SHAP value formats
+                        if isinstance(shap_values, shap.Explanation):
+                            shap.waterfall_plot(shap_values[0], show=False)
+                        else:
+                            # For older SHAP versions or TreeExplainer
+                            if len(shap_values.shape) > 1:
+                                shap_vals = shap_values[0]
+                            else:
+                                shap_vals = shap_values
+                            
+                            shap.waterfall_plot(
+                                shap.Explanation(
+                                    values=shap_vals,
+                                    base_values=explainer.expected_value if hasattr(explainer, 'expected_value') else 0,
+                                    data=input_features.iloc[0],
+                                    feature_names=st.session_state.feature_names
+                                ),
+                                show=False
+                            )
+                        
+                        st.pyplot(fig)
+                        plt.close()
+                    except Exception as e:
+                        st.warning(f"Waterfall plot display issue: {e}. Showing table instead.")
+                    
+                    # Display feature contributions as a table
+                    st.markdown("---")
+                    st.markdown("**📊 Feature Contribution Details**")
+                    
+                    # Extract SHAP values
+                    if isinstance(shap_values, shap.Explanation):
+                        shap_vals = shap_values.values[0]
+                    elif len(shap_values.shape) > 1:
+                        shap_vals = shap_values[0]
+                    else:
+                        shap_vals = shap_values
+                    
+                    # Create DataFrame
+                    feature_contributions = pd.DataFrame({
+                        'Feature': st.session_state.feature_names,
+                        'Feature Value': input_features.iloc[0].values,
+                        'SHAP Impact (relative)': shap_vals,
+                        'Impact': ['↑ Increases' if v > 0 else '↓ Decreases' if v < 0 else '→ Neutral' for v in shap_vals],
+                        'Abs Impact': np.abs(shap_vals)
+                    }).sort_values('Abs Impact', ascending=False)
+                    
+                    # Format for display
+                    feature_contributions['SHAP Impact (relative)'] = feature_contributions['SHAP Impact (relative)'].apply(lambda x: f"{x:.4f}")
+
+                    feature_contributions_display = feature_contributions[
+                        ['Feature', 'Feature Value', 'SHAP Impact (relative)', 'Impact']
+                    ].head(15)
+                    
+                    st.dataframe(feature_contributions_display, use_container_width=True, hide_index=True)
+                    
+                    # Key insights
+                    st.markdown("---")
+                    st.markdown("### 💡 Key Insights")
+                    
+                    top_positive = feature_contributions[feature_contributions['Abs Impact'] > 0].head(3)
+                    
+                    insights = []
+                    for idx, row in top_positive.iterrows():
+                        feature = row['Feature']
+                        value = row['Feature Value']
+                        impact = row['Impact']
+                        
+                        if '↑' in impact:
+                            insights.append(f"✅ **{feature}** (value: {value:.2f}) is increasing the price")
+                        elif '↓' in impact:
+                            insights.append(f"⚠️ **{feature}** (value: {value:.2f}) is decreasing the price")
+                    
+                    for insight in insights[:5]:
+                        st.markdown(insight)
+                    
+                    # Base value explanation
+                    if hasattr(explainer, 'expected_value'):
+                       base_value = explainer.expected_value
+                       # Convert to float if it's an array
+                       base_value_float = safe(base_value)
+                       predicted_price_float = safe(predicted_price)
+    
+                       st.markdown(f"""
+                       <div class="info-box" style="margin-top: 1rem;">
+                            <p style="margin:0;">
+                            <strong>Base Prediction:</strong> ₹{base_value_float:,.0f}<br>
+                            This is the average prediction across all properties. The SHAP values above show 
+                            how each feature adjusts this base value to reach the final prediction of ₹{predicted_price_float:,.0f}.
+                            </p>
+                       </div>
+                       """, unsafe_allow_html=True)
+                     
+                    
+                    # Export option
+                    st.markdown("---")
+                    col_exp1, col_exp2 = st.columns([3, 1])
+                    with col_exp2:
+                        # Convert to CSV for download
+                        #csv = feature_contributions[['Feature', 'Feature Value', 'SHAP Value', 'Impact']].to_csv(index=False)
+                        csv = feature_contributions[['Feature', 'Feature Value', 'SHAP Impact (relative)', 'Impact']].to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download Analysis",
+                            data=csv,
+                            file_name=f"shap_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+                    
+                except ImportError:
+                    st.warning("""
+                    **SHAP library not installed.**
+                    
+                    Install it with: `pip install shap`
+                    
+                    Then restart the Streamlit app to enable detailed explainability.
+                    """)
+                except Exception as e:
+                    st.error(f"Error calculating SHAP values: {e}")
+                    
+                    with st.expander("Show error details"):
+                        import traceback
+                        st.code(traceback.format_exc())
+                    
+                    # Fallback: Show basic feature importance
+                    st.markdown("---")
+                    st.markdown("**📊 Fallback: Feature Importance** (from model training)")
+                    
+                    if hasattr(best_model, 'feature_importances_'):
+                        importance_df = pd.DataFrame({
+                            'Feature': st.session_state.feature_names,
+                            'Importance': best_model.feature_importances_
+                        }).sort_values('Importance', ascending=False).head(10)
+                        
+                        fig = go.Figure(go.Bar(
+                            x=importance_df['Importance'],
+                            y=importance_df['Feature'],
+                            orientation='h',
+                            marker=dict(color='#667eea')
+                        ))
+                        fig.update_layout(
+                            title="Top 10 Important Features",
+                            xaxis_title="Importance",
+                            yaxis_title="Feature",
+                            height=400
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+            else:
+                # No input features saved - provide helpful message
+                st.info("""
+                **SHAP analysis requires input features.**
+                
+                The prediction was made using a simplified formula. To enable full SHAP analysis:
+                
+                1. Make sure models are properly loaded from `models/saved_models/`
+                2. Use the actual trained models for predictions
+                3. Save the input features DataFrame when making predictions
+                
+                See the Model Insights tab for general feature importance.
+                """)
+        
         elif models_trained:
             st.markdown("""
             <div class="info-card" style="text-align:center; padding:3rem;">
                 <h3>🔮 Make a Prediction First</h3>
-                <p>Go to <strong>Price Prediction</strong> page to make a prediction, then return here to see detailed explainability analysis.</p>
+                <p>Go to <strong>Price Prediction</strong> page to make a prediction, then return here to see detailed SHAP explainability analysis.</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -2125,6 +2496,7 @@ elif page == "🤖 AI Assistant":
                         'content': response
                     })
                     st.rerun()
+                    
 
 elif page == "📈 Market Dashboard":
     st.markdown("<h1>📈 Market Analytics Dashboard</h1>", unsafe_allow_html=True)
@@ -2137,7 +2509,9 @@ elif page == "📈 Market Dashboard":
         </p>
     </div>
     """, unsafe_allow_html=True)
-    
+    #st.info("ℹ️ Market Dashboard ROI and Rental Yield are estimated indicators "
+    #           "based on heuristics, not ML predictions."
+    #        )
     # Initialize data_source flag
     data_source = "sample"
     dashboard_data = None

@@ -13,11 +13,12 @@
         "parking",
         "prefarea",
         "furnishingstatus",
+        "price_per_sqft",
         "bed_bath_ratio",
         "facilities_score",
         "area_category"
     ],
     "best_model": "Gradient Boosting",
     "model_count": 7,
-    "training_date": "2025-12-07T15:46:40.482805"
+    "training_date": "2026-01-04T18:47:38.893850"
 }

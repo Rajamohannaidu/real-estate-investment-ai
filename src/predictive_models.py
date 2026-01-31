@@ -273,7 +273,7 @@ class RealEstatePredictiveModels:
 
 # Example usage
 if __name__ == "__main__":
-    from data_preprocessing import RealEstateDataPreprocessor
+    from src.data_preprocessing import RealEstateDataPreprocessor
     
     # Load and preprocess data
     preprocessor = RealEstateDataPreprocessor()
