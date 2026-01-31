@@ -1,0 +1,67 @@
+name: Cleanup Cloud Run & Artifact Registry
+
+on:
+    workflow_dispatch: # 🔒 manual trigger only
+
+env:
+    PROJECT_ID: project-c2023f82-4f20-4fee-b94
+    REGION: us-central1
+
+    SERVICE_NAME: realestate
+    REPOSITORY: realestate-repo
+    IMAGE_NAME: realestate
+
+jobs:
+    cleanup:
+        runs-on: ubuntu-latest
+
+        permissions:
+            contents: read
+            id-token: write
+
+        steps:
+            # ✅ Authenticate using Workload Identity Federation
+            - name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v2
+              with:
+                  workload_identity_provider: projects/68321934190/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+                  service_account: github-actions-sa@project-c2023f82-4f20-4fee-b94.iam.gserviceaccount.com
+
+            # ✅ Install gcloud CLI
+            - name: Install gcloud
+              uses: google-github-actions/setup-gcloud@v2
+              with:
+                  version: ">= 470.0.0"
+
+            # -------------------------------------------------------
+            # 🔥 Delete Cloud Run service
+            # -------------------------------------------------------
+            - name: Delete Cloud Run service
+              run: |
+                  echo "Deleting Cloud Run service..."
+                  gcloud run services delete $SERVICE_NAME \
+                    --project=$PROJECT_ID \
+                    --region=$REGION \
+                    --quiet || true
+
+            # -------------------------------------------------------
+            # 🔥 Delete all container images
+            # -------------------------------------------------------
+            - name: Delete all Docker images
+              run: |
+                  echo "Deleting all images..."
+                  gcloud artifacts docker images delete \
+                    $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE_NAME \
+                    --delete-tags \
+                    --quiet || true
+
+            # -------------------------------------------------------
+            # 🔥 Delete Artifact Registry repository
+            # -------------------------------------------------------
+            - name: Delete Artifact Registry repository
+              run: |
+                  echo "Deleting Artifact Registry repository..."
+                  gcloud artifacts repositories delete $REPOSITORY \
+                    --project=$PROJECT_ID \
+                    --location=$REGION \
+                    --quiet || true
