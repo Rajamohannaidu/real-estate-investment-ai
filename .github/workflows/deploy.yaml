@@ -7,7 +7,6 @@ on:
 
 env:
   PROJECT_ID: project-c2023f82-4f20-4fee-b94
-  PROJECT_NUMBER: 68321934190
   REGION: us-central1
 
   REPOSITORY: realestate-repo
@@ -32,16 +31,13 @@ jobs:
           workload_identity_provider: projects/68321934190/locations/global/workloadIdentityPools/github-pool/providers/github-provider
           service_account: github-actions-sa@project-c2023f82-4f20-4fee-b94.iam.gserviceaccount.com
 
-      # ✅ install gcloud ONLY (no auth refresh)
-      - name: Setup gcloud
+      # ✅ install gcloud only
+      - name: Install gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           version: ">= 470.0.0"
 
-      # ✅ set project manually
-      - name: Set project
-        run: gcloud config set project $PROJECT_ID
-
+      # ✅ docker auth does NOT refresh token
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
@@ -58,6 +54,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --project=${{ env.PROJECT_ID }} \
             --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
             --region=${{ env.REGION }} \
             --platform=managed \
