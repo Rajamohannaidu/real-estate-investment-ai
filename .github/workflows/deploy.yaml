@@ -20,38 +20,37 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write # ✅ REQUIRED for Workload Identity Federation
+      id-token: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ✅ KEYLESS AUTHENTICATION (CORRECTED)
-      - name: Authenticate to Google Cloud (WIF)
-        id: auth
+      # ✅ OIDC authentication
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: "projects/68321934190/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
-          service_account: "github-actions-sa@project-c2023f82-4f20-4fee-b94.iam.gserviceaccount.com"
+          workload_identity_provider: projects/68321934190/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-actions-sa@project-c2023f82-4f20-4fee-b94.iam.gserviceaccount.com
 
+      # ✅ install gcloud ONLY (no auth refresh)
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ env.PROJECT_ID }}
+          version: ">= 470.0.0"
 
-      - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker \
-            ${{ env.REGION }}-docker.pkg.dev \
-            --quiet
+      # ✅ set project manually
+      - name: Set project
+        run: gcloud config set project $PROJECT_ID
 
-      - name: Build Docker image
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image
         run: |
           docker build -t \
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
-            .
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest .
 
-      - name: Push Docker image
+      - name: Push image
         run: |
           docker push \
             ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
@@ -66,6 +65,4 @@ jobs:
             --port=8501 \
             --memory=4Gi \
             --timeout=900 \
-            --max-instances=3 \
-            --project=${{ env.PROJECT_ID }} \
-            --set-env-vars GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}"
+            --max-instances=3
